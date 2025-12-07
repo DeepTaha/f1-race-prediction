@@ -428,23 +428,6 @@ print(f"Win probability: {model.predict_proba(features)[0]:.1%}")
 
 ---
 
-## 🚧 Future Enhancements
-
-### Short-term
-- [ ] Real-time data integration with live race feeds
-- [ ] Tire strategy prediction model
-- [ ] Pit stop optimization algorithm
-- [ ] Weather impact deep learning model
-
-### Long-term
-- [ ] Mobile app (React Native)
-- [ ] Real-time betting odds integration
-- [ ] Multi-season championship predictor
-- [ ] Driver performance clustering analysis
-- [ ] Automated model retraining pipeline
-
----
-
 ## 📚 Learning Resources
 
 ### F1 Data Science
@@ -457,23 +440,6 @@ print(f"Win probability: {model.predict_proba(features)[0]:.1%}")
 - [XGBoost Tutorials](https://xgboost.readthedocs.io/)
 - [Feature Engineering Book](https://www.oreilly.com/library/view/feature-engineering-for/9781491953235/)
 
----
-
-## 💼 CV/Resume Talking Points
-
-When discussing this project in interviews, emphasize:
-
-1. **Problem Complexity**: Multi-class classification with 20 possible outcomes
-2. **Data Engineering**: Integrated multiple APIs, handled missing data
-3. **Feature Engineering**: Created 15+ domain-specific features
-4. **Model Selection**: Compared 4+ algorithms, selected best performer
-5. **Production Ready**: Built full-stack application with API and dashboard
-6. **Results**: Achieved 87% accuracy, beating baseline by 23%
-7. **Interpretability**: Feature importance analysis for stakeholder communication
-
-### Sample Interview Response
-
-> "I built an end-to-end F1 race prediction system that demonstrates my ML and full-stack skills. Starting with raw race data from the Ergast API, I engineered 15+ features including driver form, track history, and team performance. I compared Random Forest, XGBoost, and Neural Networks, ultimately achieving 87% accuracy with an ensemble approach. The system includes a Python-based ML pipeline and a React dashboard for interactive predictions. For the 2025 Abu Dhabi GP, my model predicted Verstappen to win with 45% probability, which I can validate post-race."
 
 ---
 
@@ -486,10 +452,9 @@ MIT License - See [LICENSE](LICENSE) file for details
 ## 👤 Author
 
 **[Your Name]**
-- GitHub: [@yourusername](https://github.com/yourusername)
-- LinkedIn: [Your LinkedIn](https://linkedin.com/in/yourprofile)
-- Portfolio: [yourportfolio.com](https://yourportfolio.com)
-- Email: your.email@example.com
+- GitHub: [DeepTaha](https://github.com/DeepTaha)
+- LinkedIn: https://www.linkedin.com/in/taha-siddiq-50546030a/
+- Email: tahasiddiq2013@gmail.com
 
 ---
 

@@ -292,19 +292,19 @@ for train_idx, test_idx in tscv.split(X):
   2. Lando Norris (McLaren) - 1:23.056
   3. Oscar Piastri (McLaren) - 1:23.104
 
-### Model Prediction (Generated: Dec 7, 2025)
+## 🏁 Abu Dhabi GP 2025 - Prediction vs Reality
 
-```python
-# Predicted Race Result
-1. Max Verstappen - 45% win probability
-2. Lando Norris - 28% win probability
-3. Oscar Piastri - 18% win probability
+### My Prediction (Made: Dec 7, 2025, 1:24 PM)
+- 🏆 **Predicted Winner:** Max Verstappen
+- 🥇 **Predicted Podium:** Verstappen, Norris, Piastri
+- 📊 **Model Confidence:** 86.2%
+- 🤖 **Model Used:** XGBoost Ensemble
 
-# Model Confidence: 86.2% (XGBoost)
-# Key Factors: Grid position, recent form, track history
-```
+### Actual Results (Dec 7, 2025, 8:00 PM)
+- 🏆 **Actual Winner:** Max Verstappen
+- 🥇 **Actual Podium:** Verstappen, Piastri, Norris
 
-**Note**: This prediction will be validated after the race. The timestamp of prediction is recorded for verification.
+
 
 ---
 

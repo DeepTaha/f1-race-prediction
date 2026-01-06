@@ -1,0 +1,18 @@
+{
+  "race": "Abu Dhabi Grand Prix 2025",
+  "date": "2025-12-08",
+  "prediction_date": "2025-12-07T13:17:43.963861",
+  "predicted_winner": "Max Verstappen",
+  "predicted_podium": [
+    "Verstappen",
+    "Norris",
+    "Piastri"
+  ],
+  "confidence": 86.2,
+  "model_used": "XGBoost Ensemble",
+  "qualifying_results": {
+    "P1": "Verstappen",
+    "P2": "Norris",
+    "P3": "Piastri"
+  }
+}

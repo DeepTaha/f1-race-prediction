@@ -7,29 +7,25 @@ __pycache__/
 venv/
 env/
 ENV/
-*.egg-info/
-dist/
-build/
 
-# Jupyter
-.ipynb_checkpoints/
-*.ipynb_checkpoints
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
-# Data & Models
-data/raw/
-data/processed/
-models/trained_models/*.pkl
-models/trained_models/*.h5
-
-# Environment
-.env
-.env.local
-
-# IDE
+# IDEs
 .vscode/
 .idea/
 *.swp
+*.swo
 
 # OS
 .DS_Store
 Thumbs.db
+
+# Project specific
+*.csv
+*.pkl
+*.h5
+.env

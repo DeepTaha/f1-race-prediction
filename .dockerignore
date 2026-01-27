@@ -1,0 +1,55 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+*.egg-info/
+dist/
+build/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Documentation
+README.md
+*.md
+docs/
+
+# Tests
+tests/
+*.test.py
+
+# Large files
+data/raw/
+*.csv
+*.pkl
+*.h5
+
+# Node modules (if any)
+node_modules/
+npm-debug.log
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore

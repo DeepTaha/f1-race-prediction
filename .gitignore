@@ -29,3 +29,8 @@ Thumbs.db
 *.pkl
 *.h5
 .env
+
+# Generated data and model artifacts (too large for git)
+dataset/fastf1_cache/
+dataset/historical_data.parquet
+artifacts/

@@ -1,14 +1,13 @@
 """
-ML pipeline: training orchestration and inference helpers.
-Kept in src/models/ so it stays close to the model code it wraps.
+ML pipeline: training orchestration, persistence, and inference helpers.
 """
 
 import os
 import sys
 
+import joblib
 import pandas as pd
 
-# Ensure project root is on sys.path when running outside of uvicorn
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
 from src.config import settings
@@ -28,7 +27,6 @@ FEATURE_COLS: list[str] = [
     "dnf_rate",
     "driver_track_avg",
     "team_track_avg",
-    "position_change",
     "quali_strength",
     "driver_encoded",
     "team_encoded",
@@ -37,16 +35,73 @@ FEATURE_COLS: list[str] = [
 ]
 
 
+# ---------------------------------------------------------------------------
+# Persistence
+# ---------------------------------------------------------------------------
+
+def save_pipeline(state: dict) -> None:
+    """Persist the trained pipeline dict to disk."""
+    os.makedirs(settings.ARTIFACTS_DIR, exist_ok=True)
+    joblib.dump(state, settings.PIPELINE_ARTIFACT_PATH)
+    logger.info("Pipeline saved → %s", settings.PIPELINE_ARTIFACT_PATH)
+
+
+def load_cached_pipeline() -> dict | None:
+    """Load a previously saved pipeline from disk. Returns None if not found or stale."""
+    path = settings.PIPELINE_ARTIFACT_PATH
+    if not os.path.exists(path):
+        return None
+    try:
+        state = joblib.load(path)
+        if not isinstance(state, dict) or not state.get("is_trained"):
+            return None
+        logger.info("Loaded cached pipeline from %s", path)
+        return state
+    except Exception as exc:
+        logger.warning("Could not load cached pipeline (%s) — will retrain", exc)
+        return None
+
+
+# ---------------------------------------------------------------------------
+# Training
+# ---------------------------------------------------------------------------
+
 @timed(logger)
-def run_training_pipeline() -> dict:
-    """Load data, engineer features, train all models, return populated state."""
-    loader = F1DataLoader()
-    df = loader.load_sample_data()
+def run_training_pipeline(
+    force_retrain: bool = False,
+    force_data_refresh: bool = False,
+) -> dict:
+    """
+    Build or restore the full prediction pipeline.
+
+    - If a saved pipeline exists and force_retrain is False, loads it from disk.
+    - Otherwise loads data (from parquet cache or FastF1), engineers features,
+      trains all models, selects the best, saves the pipeline, and returns it.
+    """
+    if not force_retrain:
+        cached = load_cached_pipeline()
+        if cached is not None:
+            return cached
+
+    logger.info(
+        "Training pipeline (force_retrain=%s, force_data_refresh=%s)",
+        force_retrain,
+        force_data_refresh,
+    )
+
+    loader = F1DataLoader(
+        cache_dir=settings.FASTF1_CACHE_DIR,
+        data_path=settings.HISTORICAL_DATA_PATH,
+    )
+    df = loader.load_historical_data(
+        years=settings.DATA_YEARS,
+        force_refresh=force_data_refresh,
+    )
 
     fe = F1FeatureEngineer(df)
     processed = fe.get_processed_data()
 
-    # Pre-compute lookup tables used during inference
+    # Lookup tables used at inference time to fill per-driver / per-track stats
     driver_stats = (
         processed.groupby("driver")[
             ["recent_form", "driver_win_rate", "dnf_rate", "quali_strength"]
@@ -62,9 +117,11 @@ def run_training_pipeline() -> dict:
     )
     global_means = processed[FEATURE_COLS].mean().to_dict()
 
+    # Sort chronologically so the train/test split respects time order
+    processed = processed.sort_values("race_id").reset_index(drop=True)
+
     X = processed[FEATURE_COLS]
-    # XGBoost requires 0-indexed labels; shift finish_position (1–20) → (0–19)
-    y = processed["finish_position"] - 1
+    y = processed["finish_position"] - 1  # XGBoost expects 0-indexed labels
 
     model = F1PredictionModel(X, y)
     model.train_all_models()
@@ -89,7 +146,7 @@ def run_training_pipeline() -> dict:
         {k: round(v, 4) for k, v in model.results.items()},
     )
 
-    return {
+    state = {
         "model": model,
         "feature_engineer": fe,
         "driver_stats": driver_stats,
@@ -101,8 +158,17 @@ def run_training_pipeline() -> dict:
         "teams": sorted(processed["team"].unique().tolist()),
         "feature_importances": feature_importances,
         "is_trained": True,
+        "training_rows": len(processed),
+        "data_source": "FastF1" if os.path.exists(settings.HISTORICAL_DATA_PATH) else "synthetic",
     }
 
+    save_pipeline(state)
+    return state
+
+
+# ---------------------------------------------------------------------------
+# Inference helpers
+# ---------------------------------------------------------------------------
 
 def _safe_encode(label_encoder, value: str, fallback: int = 0) -> int:
     try:
@@ -139,7 +205,6 @@ def build_feature_vector(
         "team_track_avg": pipeline["track_team_avgs"].get(
             (team, track), means["team_track_avg"]
         ),
-        "position_change": 0,
         "quali_strength": d.get("quali_strength", means["quali_strength"]),
         "driver_encoded": _safe_encode(fe.le_driver, driver),
         "team_encoded": _safe_encode(fe.le_team, team),
@@ -165,8 +230,7 @@ def run_inference(
     X_scaled = model.scaler.transform(X)
     best = model.best_model
 
-    # Shift back from 0-indexed label to finish position (1–20)
-    predicted_position = int(best.predict(X_scaled)[0]) + 1
+    predicted_position = int(best.predict(X_scaled)[0]) + 1  # shift back from 0-index
 
     win_prob = 0.0
     podium_prob = 0.0

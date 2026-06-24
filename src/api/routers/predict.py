@@ -10,14 +10,40 @@ from src.api.schemas import (
     PredictRequest,
     PredictResponse,
 )
+from src.data.data_loader import get_next_race
 from src.models.pipeline import run_inference
 
 router = APIRouter(prefix="/predict", tags=["Prediction"])
 
 # ---------------------------------------------------------------------------
-# Default race used by GET /predict/latest (Abu Dhabi GP 2025)
+# 2025 full driver lineup — used when no qualifying data is available yet
+# driver = abbreviation (matches training data), name = display name
 # ---------------------------------------------------------------------------
-_DEFAULT_RACE = {
+_GRID_2025 = [
+    {"driver": "VER", "name": "Max Verstappen",    "team": "Red Bull",     "grid_position": 1},
+    {"driver": "LAW", "name": "Liam Lawson",       "team": "Red Bull",     "grid_position": 2},
+    {"driver": "NOR", "name": "Lando Norris",      "team": "McLaren",      "grid_position": 3},
+    {"driver": "PIA", "name": "Oscar Piastri",     "team": "McLaren",      "grid_position": 4},
+    {"driver": "LEC", "name": "Charles Leclerc",   "team": "Ferrari",      "grid_position": 5},
+    {"driver": "HAM", "name": "Lewis Hamilton",    "team": "Ferrari",      "grid_position": 6},
+    {"driver": "RUS", "name": "George Russell",    "team": "Mercedes",     "grid_position": 7},
+    {"driver": "ANT", "name": "Kimi Antonelli",    "team": "Mercedes",     "grid_position": 8},
+    {"driver": "ALO", "name": "Fernando Alonso",   "team": "Aston Martin", "grid_position": 9},
+    {"driver": "STR", "name": "Lance Stroll",      "team": "Aston Martin", "grid_position": 10},
+    {"driver": "GAS", "name": "Pierre Gasly",      "team": "Alpine",       "grid_position": 11},
+    {"driver": "COL", "name": "Franco Colapinto",  "team": "Alpine",       "grid_position": 12},
+    {"driver": "ALB", "name": "Alex Albon",        "team": "Williams",     "grid_position": 13},
+    {"driver": "SAI", "name": "Carlos Sainz",      "team": "Williams",     "grid_position": 14},
+    {"driver": "OCO", "name": "Esteban Ocon",      "team": "Haas",         "grid_position": 15},
+    {"driver": "BEA", "name": "Oliver Bearman",    "team": "Haas",         "grid_position": 16},
+    {"driver": "HUL", "name": "Nico Hulkenberg",   "team": "Sauber",       "grid_position": 17},
+    {"driver": "BOR", "name": "Gabriel Bortoleto", "team": "Sauber",       "grid_position": 18},
+    {"driver": "TSU", "name": "Yuki Tsunoda",      "team": "RB",           "grid_position": 19},
+    {"driver": "HAD", "name": "Isack Hadjar",      "team": "RB",           "grid_position": 20},
+]
+
+# Static fallback when FastF1 schedule is unreachable
+_FALLBACK_RACE = {
     "race": "Abu Dhabi Grand Prix",
     "circuit": "Yas Marina Circuit",
     "season": 2025,
@@ -27,33 +53,29 @@ _DEFAULT_RACE = {
     "temperature": 29,
 }
 
-_DEFAULT_GRID = [
-    {"driver": "Verstappen", "team": "Red Bull",     "code": "VER", "grid_position": 1},
-    {"driver": "Norris",     "team": "McLaren",       "code": "NOR", "grid_position": 2},
-    {"driver": "Piastri",    "team": "McLaren",       "code": "PIA", "grid_position": 3},
-    {"driver": "Leclerc",    "team": "Ferrari",       "code": "LEC", "grid_position": 4},
-    {"driver": "Hamilton",   "team": "Ferrari",       "code": "HAM", "grid_position": 5},
-    {"driver": "Russell",    "team": "Mercedes",      "code": "RUS", "grid_position": 6},
-    {"driver": "Sainz",      "team": "Ferrari",       "code": "SAI", "grid_position": 7},
-    {"driver": "Perez",      "team": "Red Bull",      "code": "PER", "grid_position": 8},
-    {"driver": "Alonso",     "team": "Aston Martin",  "code": "ALO", "grid_position": 9},
-    {"driver": "Stroll",     "team": "Aston Martin",  "code": "STR", "grid_position": 10},
-]
+
+def _resolve_default_race() -> dict:
+    """Return the next upcoming race. Falls back to the Abu Dhabi GP if none found."""
+    dynamic = get_next_race()
+    return dynamic if dynamic is not None else dict(_FALLBACK_RACE)
 
 
 @router.get("/latest", tags=["Prediction"])
 def predict_latest(pipeline: dict = Depends(get_pipeline)):
-    """Run predictions for the default race grid — consumed by the dashboard."""
+    """Predict race outcomes for the next upcoming Grand Prix (full 20-car grid)."""
+    race = _resolve_default_race()
+
     predictions = []
-    for entry in _DEFAULT_GRID:
+    for entry in _GRID_2025:
         result = run_inference(
-            entry["driver"], entry["team"], _DEFAULT_RACE["track"],
-            entry["grid_position"], _DEFAULT_RACE["weather"], _DEFAULT_RACE["temperature"],
+            entry["driver"], entry["team"], race["track"],
+            entry["grid_position"], race["weather"], race["temperature"],
             pipeline,
         )
         predictions.append({
             "driver":             entry["driver"],
-            "driver_code":        entry["code"],
+            "driver_code":        entry["driver"],
+            "driver_name":        entry["name"],
             "team":               entry["team"],
             "grid_position":      entry["grid_position"],
             "predicted_position": result["predicted_position"],
@@ -62,18 +84,19 @@ def predict_latest(pipeline: dict = Depends(get_pipeline)):
         })
 
     predictions.sort(key=lambda x: x["predicted_position"])
-    # Re-index to remove ties in display order
     for i, p in enumerate(predictions):
         p["position"] = i + 1
 
     return {
-        "race":       _DEFAULT_RACE["race"],
-        "circuit":    _DEFAULT_RACE["circuit"],
-        "season":     _DEFAULT_RACE["season"],
-        "round":      _DEFAULT_RACE["round"],
-        "timestamp":  datetime.now().isoformat(),
+        "race":        race["race"],
+        "circuit":     race["circuit"],
+        "season":      race["season"],
+        "round":       race["round"],
+        "timestamp":   datetime.now().isoformat(),
         "predictions": predictions,
-        "model_used": pipeline["model"].best_model_name,
+        "model_used":  pipeline["model"].best_model_name,
+        "data_source": pipeline.get("data_source", "unknown"),
+        "training_rows": pipeline.get("training_rows", 0),
     }
 
 

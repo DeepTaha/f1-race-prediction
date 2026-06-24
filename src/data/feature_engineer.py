@@ -14,42 +14,54 @@ class F1FeatureEngineer:
         self.df = df.copy()
         
     def create_driver_features(self):
-        """Create driver performance metrics"""
-        # Recent form (last 5 races average position)
+        """Create driver performance metrics using only past races to avoid leakage."""
         self.df = self.df.sort_values(['driver', 'race_id'])
+
+        # Recent form: rolling mean of last 5 finish positions, shifted so current race excluded
         self.df['recent_form'] = self.df.groupby('driver')['finish_position'].transform(
-            lambda x: x.rolling(5, min_periods=1).mean()
+            lambda x: x.shift(1).rolling(5, min_periods=1).mean()
         )
-        
-        # Driver win rate
+
+        # Win rate: fraction of past races where driver finished P1
         self.df['driver_win_rate'] = self.df.groupby('driver')['finish_position'].transform(
-            lambda x: (x == 1).sum() / len(x)
+            lambda x: (x.shift(1) == 1).expanding(min_periods=1).mean()
         )
-        
-        # DNF rate
-        self.df['dnf_rate'] = self.df.groupby('driver')['dnf'].transform('mean')
-        
-        print("✓ Created driver performance features")
-        
+
+        # DNF rate: fraction of past races where driver retired
+        self.df['dnf_rate'] = self.df.groupby('driver')['dnf'].transform(
+            lambda x: x.shift(1).expanding(min_periods=1).mean()
+        )
+
+        print("[OK] Created driver performance features")
+
     def create_track_features(self):
-        """Create track-specific features"""
-        # Driver performance at specific track
-        self.df['driver_track_avg'] = self.df.groupby(['driver', 'track'])['finish_position'].transform('mean')
-        
-        # Team performance at track
-        self.df['team_track_avg'] = self.df.groupby(['team', 'track'])['finish_position'].transform('mean')
-        
-        print("✓ Created track-specific features")
-        
+        """Create track-specific features using only past races to avoid leakage."""
+        self.df = self.df.sort_values(['driver', 'track', 'race_id'])
+
+        # Driver's past average finish position at this specific track
+        self.df['driver_track_avg'] = self.df.groupby(['driver', 'track'])['finish_position'].transform(
+            lambda x: x.shift(1).expanding(min_periods=1).mean()
+        )
+
+        self.df = self.df.sort_values(['team', 'track', 'race_id'])
+
+        # Team's past average finish position at this specific track
+        self.df['team_track_avg'] = self.df.groupby(['team', 'track'])['finish_position'].transform(
+            lambda x: x.shift(1).expanding(min_periods=1).mean()
+        )
+
+        print("[OK] Created track-specific features")
+
     def create_qualifying_impact(self):
-        """Model qualifying position impact"""
-        # Position change (grid to finish)
-        self.df['position_change'] = self.df['grid_position'] - self.df['finish_position']
-        
-        # Qualifying performance indicator
-        self.df['quali_strength'] = self.df.groupby('driver')['grid_position'].transform('mean')
-        
-        print("✓ Created qualifying features")
+        """Model qualifying position impact using only past races."""
+        self.df = self.df.sort_values(['driver', 'race_id'])
+
+        # Historical average qualifying position per driver (past races only)
+        self.df['quali_strength'] = self.df.groupby('driver')['grid_position'].transform(
+            lambda x: x.shift(1).expanding(min_periods=1).mean()
+        )
+
+        print("[OK] Created qualifying features")
         
     def encode_categorical(self):
         """Encode categorical variables"""
@@ -63,7 +75,7 @@ class F1FeatureEngineer:
         self.df['track_encoded'] = self.le_track.fit_transform(self.df['track'])
         self.df['weather_encoded'] = self.le_weather.fit_transform(self.df['weather'])
         
-        print("✓ Encoded categorical variables")
+        print("[OK] Encoded categorical variables")
         
     def get_processed_data(self):
         """Return fully processed dataset"""
@@ -71,10 +83,8 @@ class F1FeatureEngineer:
         self.create_track_features()
         self.create_qualifying_impact()
         self.encode_categorical()
-        
+
         # Handle missing values
         self.df.fillna(self.df.mean(numeric_only=True), inplace=True)
-        
-        return self.df
-    
+
         return self.df

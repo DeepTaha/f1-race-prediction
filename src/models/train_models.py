@@ -23,16 +23,18 @@ class F1PredictionModel:
         self.best_model = None
         
     def prepare_data(self, test_size=0.2):
-        """Split and scale data"""
-        self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(
-            self.X, self.y, test_size=test_size, random_state=42
-        )
-        
+        """Chronological split — no shuffling to prevent temporal leakage in time-series data."""
+        split_idx = int(len(self.X) * (1 - test_size))
+        self.X_train = self.X.iloc[:split_idx]
+        self.X_test  = self.X.iloc[split_idx:]
+        self.y_train = self.y.iloc[:split_idx]
+        self.y_test  = self.y.iloc[split_idx:]
+
         self.scaler = StandardScaler()
         self.X_train_scaled = self.scaler.fit_transform(self.X_train)
-        self.X_test_scaled = self.scaler.transform(self.X_test)
-        
-        print(f"✓ Train set: {len(self.X_train)}, Test set: {len(self.X_test)}")
+        self.X_test_scaled  = self.scaler.transform(self.X_test)
+
+        print(f"[OK] Train set: {len(self.X_train)}, Test set: {len(self.X_test)}")
         
     def train_random_forest(self):
         """Train Random Forest classifier"""
@@ -46,18 +48,23 @@ class F1PredictionModel:
         self.models['Random Forest'] = rf
         self.results['Random Forest'] = accuracy
         
-        print(f"✓ Random Forest Accuracy: {accuracy:.4f}")
+        print(f"[OK] Random Forest Accuracy: {accuracy:.4f}")
         return rf
         
     def train_xgboost(self):
         """Train XGBoost classifier"""
         print("\nTraining XGBoost...")
         xgb_model = xgb.XGBClassifier(
-            n_estimators=100,
-            learning_rate=0.1,
-            max_depth=5,
+            n_estimators=200,
+            learning_rate=0.05,
+            max_depth=3,
+            min_child_weight=5,
+            subsample=0.8,
+            colsample_bytree=0.8,
+            reg_alpha=0.5,
+            reg_lambda=2.0,
             random_state=42,
-            n_jobs=-1
+            n_jobs=-1,
         )
         xgb_model.fit(self.X_train_scaled, self.y_train)
         
@@ -67,13 +74,20 @@ class F1PredictionModel:
         self.models['XGBoost'] = xgb_model
         self.results['XGBoost'] = accuracy
         
-        print(f"✓ XGBoost Accuracy: {accuracy:.4f}")
+        print(f"[OK] XGBoost Accuracy: {accuracy:.4f}")
         return xgb_model
         
     def train_gradient_boosting(self):
         """Train Gradient Boosting classifier"""
         print("\nTraining Gradient Boosting...")
-        gb = GradientBoostingClassifier(n_estimators=100, random_state=42)
+        gb = GradientBoostingClassifier(
+            n_estimators=200,
+            learning_rate=0.05,
+            max_depth=3,
+            min_samples_leaf=10,
+            subsample=0.8,
+            random_state=42,
+        )
         gb.fit(self.X_train_scaled, self.y_train)
         
         y_pred = gb.predict(self.X_test_scaled)
@@ -82,7 +96,7 @@ class F1PredictionModel:
         self.models['Gradient Boosting'] = gb
         self.results['Gradient Boosting'] = accuracy
         
-        print(f"✓ Gradient Boosting Accuracy: {accuracy:.4f}")
+        print(f"[OK] Gradient Boosting Accuracy: {accuracy:.4f}")
         return gb
     
     def train_all_models(self):
@@ -100,15 +114,15 @@ class F1PredictionModel:
         self.best_model_name = max(self.results, key=self.results.get)
         self.best_model = self.models[self.best_model_name]
         
-        print(f"\n✓ Best Model: {self.best_model_name} ({self.results[self.best_model_name]:.4f})")
+        print(f"\n[OK] Best Model: {self.best_model_name} ({self.results[self.best_model_name]:.4f})")
         
     def save_models(self, path='models/trained_models/'):
         """Save trained models"""
         for name, model in self.models.items():
             filename = f"{path}{name.lower().replace(' ', '_')}.pkl"
             joblib.dump(model, filename)
-            print(f"✓ Saved {name} to {filename}")
+            print(f"[OK] Saved {name} to {filename}")
         
         # Save scaler
         joblib.dump(self.scaler, f"{path}scaler.pkl")
-        print(f"✓ Saved scaler")
+        print(f"[OK] Saved scaler")

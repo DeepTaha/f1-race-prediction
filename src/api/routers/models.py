@@ -1,6 +1,6 @@
 from typing import List
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Query, Request
 
 from src.api.dependencies import get_pipeline
 from src.api.schemas import FeatureImportance, ModelPerformance
@@ -24,13 +24,23 @@ def feature_importance(pipeline: dict = Depends(get_pipeline)):
 
 
 @router.post("/train")
-def retrain(request: Request):
-    """Retrain all models from scratch and hot-swap the active pipeline."""
-    new_pipeline = run_training_pipeline()
+def retrain(
+    request: Request,
+    refresh_data: bool = Query(
+        False,
+        description="Re-download race data from FastF1 before retraining (slow on first run).",
+    ),
+):
+    """Retrain all models and hot-swap the active pipeline.
+    Pass ?refresh_data=true to also re-fetch historical data from FastF1.
+    """
+    new_pipeline = run_training_pipeline(force_retrain=True, force_data_refresh=refresh_data)
     request.app.state.pipeline = new_pipeline
     model = new_pipeline["model"]
     return {
         "message": "Models retrained successfully",
         "best_model": model.best_model_name,
         "results": {k: round(v, 4) for k, v in model.results.items()},
+        "training_rows": new_pipeline.get("training_rows", 0),
+        "data_source": new_pipeline.get("data_source", "unknown"),
     }
